@@ -10,9 +10,9 @@ Automatizar a validação de dados, identificar inconsistências e anomalias e a
 
 ## Status
 
-**Em desenvolvimento — Fases 1, 2 e 3 concluídas em sua versão inicial.**
+**Em desenvolvimento — Fases 1 a 6 concluídas; Fase 7 em andamento.**
 
-O projeto já conta com um motor de qualidade de dados, interface de linha de comando e API REST funcional. As próximas etapas incluem dashboards, Machine Learning, agentes de IA e integração com serviços Cloud.
+O projeto possui motor de qualidade, CLI, FastAPI, Machine Learning e investigação assistida por IA. Duas interfaces coexistem: o dashboard Streamlit, com qualidade, ML e investigação, e o frontend React, com Visão Geral e Qualidade dos Dados integradas. A Etapa 7.4 está em revisão final antes do versionamento; ML, investigação e relatórios no React permanecem para próximas entregas.
 
 ## Visão geral
 
@@ -20,9 +20,9 @@ O LucOps AI é uma plataforma modular de qualidade e monitoramento de dados empr
 
 Seu objetivo é automatizar a identificação de inconsistências, gerar indicadores de qualidade e fornecer informações para apoiar análises e decisões.
 
-Atualmente, a plataforma permite processar arquivos CSV, aplicar regras de validação, identificar registros inconsistentes e disponibilizar os resultados por meio de uma interface de linha de comando (CLI) ou API REST.
+Atualmente, a plataforma processa arquivos CSV, aplica regras de validação e disponibiliza os resultados por CLI, API REST e interfaces React e Streamlit.
 
-A arquitetura foi desenvolvida de forma modular, permitindo a evolução para bancos de dados, dashboards, detecção de anomalias e investigação assistida por inteligência artificial.
+A arquitetura separa qualidade, detecção de anomalias e investigação assistida, permitindo a evolução para outras fontes e bancos de dados.
 
 ## Funcionalidades implementadas
 
@@ -58,6 +58,7 @@ A arquitetura foi desenvolvida de forma modular, permitindo a evolução para ba
 
 - **Linguagem:** Python.
 - **Backend:** FastAPI e Uvicorn.
+- **Interfaces:** React, TypeScript, Vite, Tailwind CSS e Streamlit.
 - **Testes:** Pytest, TestClient e Bruno.
 - **Qualidade de código:** Ruff.
 - **Versionamento:** Git e GitHub.
@@ -79,6 +80,10 @@ O projeto utiliza uma arquitetura modular, com responsabilidades separadas:
 - `api.py`: exposição das funcionalidades por meio de endpoints REST.
 
 A API utiliza o motor de qualidade de dados existente, evitando duplicação de regras de negócio.
+
+`frontend/` contém a interface React, com componentes compartilhados, páginas,
+cliente HTTP e contexto de análise em memória. `dashboard/` mantém o Streamlit;
+`src/lucops/ml/` e `src/lucops/agents/` concentram ML e investigação.
 
 ## Como executar
 
@@ -134,6 +139,32 @@ Para acessar a documentação interativa Swagger UI:
 
 `http://127.0.0.1:8000/docs`
 
+### Interface React — Visão Geral e Qualidade dos Dados
+
+Com a FastAPI em execução no terminal 1, abra outro terminal na raiz do projeto.
+Use Node.js compatível com Vite 6 e o lockfile existente para instalar o frontend:
+
+```powershell
+cd frontend
+npm.cmd ci
+npm.cmd run dev
+```
+
+Acesse `http://localhost:5173`. Envie um CSV na Visão Geral e clique em
+**Analisar qualidade**. A requisição envia `file` e `include_details=true` para
+`POST /analyses`; indicadores, gráfico e tabela usam o mesmo resultado. Em
+**Qualidade dos Dados**, pesquise pelo índice ou descrição e filtre por campo e
+regra. Os filtros são locais e abrangem apenas os detalhes recebidos: a API
+retorna até 200 ocorrências, com aviso de truncamento e totais completos no
+resumo. **Ver regra** apresenta o identificador original da validação.
+
+A aplicação distingue detalhes ausentes, lista vazia e filtros sem resultados.
+Substituir o CSV limpa o estado; falhar na reanálise do mesmo arquivo preserva o
+último resultado confirmado. ML continua **Não analisado** no React. Anomalias,
+Investigações e Relatórios possuem páginas de preparação, sem ações integradas.
+O dashboard Streamlit continua disponível conforme as instruções adiante.
+Consulte [execução, contrato e validação do frontend](frontend/README.md).
+
 ### 4. Endpoints disponíveis
 
 **GET /health**
@@ -155,6 +186,11 @@ Recebe um arquivo CSV por meio de `multipart/form-data` e executa uma análise d
 
 O arquivo deve ser enviado no campo `file`.
 
+Para incluir as inconsistências individuais na mesma análise, envie também o campo
+opcional `include_details=true` em `multipart/form-data`. O padrão é `false`, e a
+resposta anterior permanece igual quando o campo é omitido. O processamento usa
+as mesmas validações do resumo; não há uma segunda análise.
+
 Exemplo de resposta:
 
 ```json
@@ -169,6 +205,43 @@ Exemplo de resposta:
   }
 }
 ```
+
+A resposta com detalhes inclui adicionalmente:
+
+```json
+{
+  "details": {
+    "items": [
+      {
+        "record_index": 2,
+        "field": "valor",
+        "rule": "is_positive_amount",
+        "description": "Valor não atende à regra de validação."
+      }
+    ],
+    "returned_issues": 1,
+    "total_issues": 1,
+    "limit": 200,
+    "truncated": false,
+    "record_index_base": 1
+  }
+}
+```
+
+`record_index` começa em **1** e conta registros de dados do CSV (sem contar o
+cabeçalho); não representa necessariamente a linha física quando houver campos
+multilinha. O índice identifica registros mesmo com `id_transacao` ausente ou
+duplicado. Cada ocorrência tem um item, portanto um registro pode ter vários.
+`rule` usa o nome da função realmente configurada para a regra de `valor`; as
+validações de presença e unicidade recebem descrições legíveis. O pipeline não
+fornece códigos de regra, categorias nem severidades. Valores originais,
+`cliente_id` e demais campos do CSV não são retornados nos detalhes.
+
+São retornadas no máximo 200 ocorrências, na ordem do processamento. O resumo
+mantém os totais completos; `returned_issues` indica quantas aparecem na
+resposta e `truncated` informa se existem outras não exibidas. No Swagger UI
+(`/docs`), abra `POST /analyses`, clique em **Try it out**, selecione o CSV no
+campo `file` e marque `include_details` como `true`.
 
 A API utiliza os seguintes códigos HTTP:
 
@@ -185,6 +258,16 @@ Executar todos os testes Python:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -v
+```
+
+Para a suíte Python completa, instale previamente os extras `dev`, `dashboard`
+e `ml` no ambiente (`python -m pip install -e ".[dev,dashboard,ml]"`).
+Os testes frontend são independentes; execute dentro de `frontend/`:
+
+```powershell
+npm.cmd test
+npm.cmd run lint
+npm.cmd run build
 ```
 
 Verificar a qualidade do código:
@@ -235,12 +318,9 @@ Os testes verificam códigos HTTP e informações retornadas no JSON.
 
 - Integração com bancos de dados.
 - Pipelines de ingestão e transformação de dados.
-- Dashboards e indicadores visuais de qualidade.
-- Detecção de anomalias com Machine Learning.
-- Agentes de IA para investigação de inconsistências.
+- Integração de Machine Learning, investigação e relatórios na interface React.
 - Integração com serviços Cloud.
 - Containerização com Docker.
-- Integração contínua com GitHub Actions.
 - Evolução da interface web e dos recursos de observabilidade.
 
 ## Desenvolvimento
@@ -369,8 +449,7 @@ e verificações de qualidade automaticamente.
 
 ### Próximas evoluções
 
-- Detecção de anomalias com Machine Learning.
-- Agentes de IA para investigação de inconsistências.
+- Evolução das integrações de ML e investigação já disponíveis no Streamlit.
 - Integração com outras fontes de dados.
 - Implantação utilizando Docker e Cloud.
 
@@ -485,7 +564,7 @@ enviado ao modelo. Falhas não alternam para respostas simuladas. Consulte
 [configuração e controles](docs/ai-investigation.md) e
 [avaliação e revisão humana](docs/ai-investigation-evaluation.md).
 Alertas estatísticos não são probabilidades nem confirmação de fraude.
-A Fase 6 ainda depende de validação manual e revisão técnica antes do merge.
+A Fase 6 foi concluída; o provedor OpenAI real continua sujeito a revisão e autorização explícita antes de qualquer chamada paga.
 
 Na seção **Investigação com IA**, a visão de negócio apresenta em português
 o registro, a qualidade, a situação do ML, as evidências principais com

@@ -2,7 +2,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from .pipeline import run_pipeline
+from .pipeline import RecordValidationResult, run_pipeline
 from .reporting import format_quality_report, save_quality_report
 from .summary import DataQualitySummary, summarize_results
 
@@ -12,6 +12,7 @@ class AnalysisResult:
     summary: DataQualitySummary
     report: str
     saved_path: Path
+    validation_results: tuple[RecordValidationResult, ...] | None = None
 
 
 def analyze_csv(
@@ -20,6 +21,7 @@ def analyze_csv(
     required_columns: Iterable[str],
     rules: Mapping[str, Callable[[str], bool]] | None = None,
     unique_fields: Iterable[str] | None = None,
+    include_validation_results: bool = False,
 ) -> AnalysisResult:
     """Run a complete data quality analysis."""
 
@@ -43,4 +45,5 @@ def analyze_csv(
         summary=summary,
         report=report,
         saved_path=saved_path,
+        validation_results=tuple(results) if include_validation_results else None,
     )
