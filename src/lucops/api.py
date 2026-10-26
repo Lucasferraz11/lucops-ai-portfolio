@@ -7,6 +7,7 @@ from typing import Annotated, Literal
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
+from .analysis_details import build_analysis_details
 from .application import analyze_csv
 from .rules import is_positive_amount
 from .status import get_quality_status
@@ -29,8 +30,12 @@ def health_check() -> dict[str, str]:
 @app.post("/analyses")
 def create_analysis(
     file: Annotated[UploadFile, File()],
+    include_details: Annotated[
+        bool,
+        Form(description="Inclui até 200 inconsistências, sem valores brutos do CSV."),
+    ] = False,
 ) -> dict[str, object]:
-    """Analyze an uploaded CSV file."""
+    """Analyze an uploaded CSV; optional details use the same validation run."""
 
     with TemporaryDirectory() as temporary_dir:
         directory = Path(temporary_dir)
@@ -52,6 +57,7 @@ def create_analysis(
                 ],
                 rules={"valor": is_positive_amount},
                 unique_fields=["id_transacao"],
+                include_validation_results=include_details,
             )
         except ValueError as exc:
             raise HTTPException(
@@ -59,10 +65,17 @@ def create_analysis(
                 detail=f"CSV inválido: {exc}",
             ) from exc
 
-    return {
+    response: dict[str, object] = {
         "quality_status": get_quality_status(result.summary),
         "summary": asdict(result.summary),
     }
+    if include_details and result.validation_results is not None:
+        response["details"] = build_analysis_details(
+            result.validation_results,
+            total_issues=result.summary.total_issues,
+            rule_names={"valor": is_positive_amount.__name__},
+        )
+    return response
 
 
 @app.post(
