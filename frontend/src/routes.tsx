@@ -3,6 +3,7 @@ import { AppShell } from './components/AppShell'
 import { OverviewPage } from './pages/OverviewPage'
 import { PreparationPage } from './pages/PreparationPage'
 import { QualityPage } from './pages/QualityPage'
+import { AnomaliesPage } from './pages/AnomaliesPage'
 
 export function AppRoutes() {
   return (
@@ -10,16 +11,7 @@ export function AppRoutes() {
       <Route element={<AppShell />}>
         <Route index element={<OverviewPage />} />
         <Route path="qualidade" element={<QualityPage />} />
-        <Route
-          path="anomalias"
-          element={
-            <PreparationPage
-              title="Detecção de Anomalias"
-              description="Alertas estatísticos e registros avaliados serão exibidos aqui."
-              icon="anomalies"
-            />
-          }
-        />
+        <Route path="anomalias" element={<AnomaliesPage />} />
         <Route
           path="investigacoes"
           element={

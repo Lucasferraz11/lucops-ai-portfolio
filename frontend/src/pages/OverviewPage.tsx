@@ -17,20 +17,20 @@ const indicators = [
 ]
 
 export function OverviewPage() {
-  const { selectedFile, analysis, isAnalyzing, error } = useAnalysis()
+  const { selectedFile, analysis, isAnalyzing, error, anomaly } = useAnalysis()
   const summary = analysis?.summary
   const display = summary ? qualityDisplay(summary) : null
   const values = [
     display?.total ?? '—',
     display?.percent ?? '—',
     display?.issues ?? '—',
-    'Não analisado',
+    anomaly.result ? formatCount(anomaly.result.anomalies_detected) : anomaly.status === 'loading' ? 'Em análise' : anomaly.status === 'not-analyzed' ? 'Não analisado' : 'Indisponível',
   ]
   const captions = [
     summary ? 'CSV atual' : 'Aguardando análise',
     analysis?.quality_status ?? 'Aguardando análise',
     summary ? 'Ocorrências no CSV atual' : 'Aguardando análise',
-    'Análise de ML ainda não executada',
+    anomaly.result ? anomaly.status === 'success' ? 'Alertas estatísticos · CSV atual' : 'Última análise de ML concluída' : anomaly.status === 'not-analyzed' ? 'Análise de ML ainda não executada' : 'Consulte Detecção de Anomalias',
   ]
   return (
     <>
@@ -96,9 +96,10 @@ export function OverviewPage() {
           <div className="mt-5">
             <EmptyState
               icon="investigations"
-              title="Nenhum resultado disponível"
+              title={anomaly.result ? 'Análise de ML disponível' : 'Execuções independentes'}
               description="A análise de qualidade não executa detecção de anomalias nem investigação com IA."
             />
+            <Link to="/anomalias" className="mt-4 inline-flex min-h-10 items-center text-sm font-semibold text-primary hover:underline">Ver detecção de anomalias →</Link>
           </div>
         </SurfaceCard>
       </div>

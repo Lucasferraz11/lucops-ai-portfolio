@@ -1,7 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
-import { ApiError, createAnalysis, getHealth, type AnalysisResponse } from '../services/api'
+import { ApiError, createAnalysis, createAnomalyAnalysis, getHealth, type AnalysisResponse, type AnomalyAnalysisResponse } from '../services/api'
 
 export type ApiStatus = 'checking' | 'connected' | 'unavailable'
+
+interface AnomalyState {
+  status: 'not-analyzed' | 'loading' | 'success' | 'error' | 'unavailable'
+  result: AnomalyAnalysisResponse | null
+  error: string | null
+}
+
+const initialAnomalyState: AnomalyState = { status: 'not-analyzed', result: null, error: null }
 
 interface AnalysisContextValue {
   selectedFile: File | null
@@ -11,6 +19,8 @@ interface AnalysisContextValue {
   apiStatus: ApiStatus
   selectFile: (file: File | null) => void
   analyze: () => Promise<void>
+  anomaly: AnomalyState
+  analyzeAnomalies: () => Promise<void>
 }
 
 const AnalysisContext = createContext<AnalysisContextValue | null>(null)
@@ -24,11 +34,15 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   const request = useRef<AbortController | null>(null)
   const healthRequest = useRef<AbortController | null>(null)
   const busy = useRef(false)
+  const [anomaly, setAnomaly] = useState<AnomalyState>(initialAnomalyState)
+  const anomalyRequest = useRef<AbortController | null>(null)
 
   useEffect(() => () => {
     request.current?.abort()
     request.current = null
     busy.current = false
+    anomalyRequest.current?.abort()
+    anomalyRequest.current = null
   }, [])
 
   const refreshApiStatus = useCallback(async (force = false) => {
@@ -61,6 +75,9 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   }, [refreshApiStatus])
 
   const selectFile = useCallback((file: File | null) => {
+    anomalyRequest.current?.abort()
+    anomalyRequest.current = null
+    setAnomaly(initialAnomalyState)
     request.current?.abort()
     request.current = null
     busy.current = false
@@ -99,8 +116,32 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedFile, refreshApiStatus])
 
+  const analyzeAnomalies = useCallback(async () => {
+    if (!selectedFile || anomalyRequest.current) return
+    const controller = new AbortController()
+    anomalyRequest.current = controller
+    setAnomaly((previous) => ({ ...previous, status: 'loading', error: null }))
+    try {
+      const result = await createAnomalyAnalysis(selectedFile, controller.signal)
+      if (anomalyRequest.current === controller) setAnomaly({ status: 'success', result, error: null })
+    } catch (cause) {
+      if (anomalyRequest.current === controller) {
+        setAnomaly((previous) => ({
+          ...previous,
+          status: cause instanceof ApiError && cause.status === 503 ? 'unavailable' : 'error',
+          error: cause instanceof ApiError ? cause.message : 'Não foi possível concluir a análise de anomalias.',
+        }))
+      }
+    } finally {
+      if (anomalyRequest.current === controller) {
+        anomalyRequest.current = null
+        void refreshApiStatus(true)
+      }
+    }
+  }, [selectedFile, refreshApiStatus])
+
   return (
-    <AnalysisContext.Provider value={{ selectedFile, analysis, isAnalyzing, error, apiStatus, selectFile, analyze }}>
+    <AnalysisContext.Provider value={{ selectedFile, analysis, isAnalyzing, error, apiStatus, selectFile, analyze, anomaly, analyzeAnomalies }}>
       {children}
     </AnalysisContext.Provider>
   )
