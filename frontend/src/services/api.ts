@@ -35,6 +35,30 @@ export interface HealthResponse {
   service: 'LucOps AI'
 }
 
+export interface AnomalyResult {
+  record_index: number
+  transaction_id: string
+  original_value: string
+  anomaly_score: number
+  is_anomaly: boolean
+}
+
+export interface IneligibleTransaction {
+  record_index: number
+  transaction_id: string
+  original_value: string
+  issues: { field: string; message: string; value: unknown; expected: unknown }[]
+}
+
+export interface AnomalyAnalysisResponse {
+  model_version: string
+  evaluated_records: number
+  skipped_records: number
+  anomalies_detected: number
+  results: AnomalyResult[]
+  ineligible: IneligibleTransaction[]
+}
+
 const baseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 const HEALTH_TIMEOUT_MS = 5_000
 const ANALYSIS_TIMEOUT_MS = 30_000
@@ -88,7 +112,25 @@ function isAnalysisResponse(value: unknown): value is AnalysisResponse {
   )
 }
 
-async function request(path: '/health' | '/analyses', options?: RequestInit): Promise<unknown> {
+function isAnomalyAnalysisResponse(value: unknown): value is AnomalyAnalysisResponse {
+  if (!isRecord(value) || !Array.isArray(value.results) || !Array.isArray(value.ineligible)) return false
+  const hasIdentity = (item: unknown): item is Record<string, unknown> => isRecord(item) &&
+    isNonnegativeInteger(item.record_index) && item.record_index >= 1 &&
+    typeof item.transaction_id === 'string' && typeof item.original_value === 'string'
+  return typeof value.model_version === 'string' && value.model_version.length > 0 &&
+    isNonnegativeInteger(value.evaluated_records) && value.evaluated_records === value.results.length &&
+    isNonnegativeInteger(value.skipped_records) && value.skipped_records === value.ineligible.length &&
+    value.results.every((item) => hasIdentity(item) && typeof item.anomaly_score === 'number' &&
+      Number.isFinite(item.anomaly_score) && typeof item.is_anomaly === 'boolean') &&
+    value.ineligible.every((item) => hasIdentity(item) && Array.isArray(item.issues) && item.issues.every(
+      (issue) => isRecord(issue) && typeof issue.field === 'string' && typeof issue.message === 'string' &&
+        'value' in issue && 'expected' in issue,
+    )) &&
+    isNonnegativeInteger(value.anomalies_detected) &&
+    value.anomalies_detected === value.results.filter((item) => item.is_anomaly === true).length
+}
+
+async function request(path: '/health' | '/analyses' | '/anomaly-analyses', options?: RequestInit): Promise<unknown> {
   const controller = new AbortController()
   const onAbort = () => controller.abort()
   options?.signal?.addEventListener('abort', onAbort, { once: true })
@@ -120,7 +162,7 @@ async function request(path: '/health' | '/analyses', options?: RequestInit): Pr
 
     // Vite 6 returns an empty text/plain HTTP 500 when its local proxy cannot reach the target.
     // A second health check distinguishes this signature from a working backend returning 500.
-    if (path === '/analyses' && response.status === 500 && !body &&
+    if (path !== '/health' && response.status === 500 && !body &&
         response.headers.get('content-type')?.startsWith('text/plain') && import.meta.env.DEV && !baseUrl) {
       try {
         await getHealth(controller.signal)
@@ -171,6 +213,24 @@ export async function createAnalysis(file: File, signal?: AbortSignal): Promise<
   const result = await request('/analyses', { method: 'POST', body: form, signal })
   if (!isAnalysisResponse(result)) {
     throw new ApiError('A API retornou um resultado de análise incompatível.', undefined, 'response')
+  }
+  return result
+}
+
+export async function createAnomalyAnalysis(file: File, signal?: AbortSignal): Promise<AnomalyAnalysisResponse> {
+  const form = new FormData()
+  form.append('file', file)
+  let result: unknown
+  try {
+    result = await request('/anomaly-analyses', { method: 'POST', body: form, signal })
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.status === 503) {
+      throw new ApiError('Modelo de ML indisponível no servidor. Solicite ao administrador a configuração de um modelo compatível.', 503)
+    }
+    throw cause
+  }
+  if (!isAnomalyAnalysisResponse(result)) {
+    throw new ApiError('A API retornou um resultado de anomalias incompatível.', undefined, 'response')
   }
   return result
 }

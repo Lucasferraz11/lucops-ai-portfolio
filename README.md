@@ -12,7 +12,7 @@ Automatizar a validação de dados, identificar inconsistências e anomalias e a
 
 **Em desenvolvimento — Fases 1 a 6 concluídas; Fase 7 em andamento.**
 
-O projeto possui motor de qualidade, CLI, FastAPI, Machine Learning e investigação assistida por IA. Duas interfaces coexistem: o dashboard Streamlit, com qualidade, ML e investigação, e o frontend React, com Visão Geral e Qualidade dos Dados integradas. A Etapa 7.4 está em revisão final antes do versionamento; ML, investigação e relatórios no React permanecem para próximas entregas.
+O projeto possui motor de qualidade, CLI, FastAPI, Machine Learning e investigação assistida por IA. Duas interfaces coexistem: o dashboard Streamlit, com qualidade, ML e investigação, e o frontend React. A Etapa 7.4 está concluída e integrada à `main`, com Visão Geral e Qualidade dos Dados funcionando no React. A Etapa 7.5, Detecção de Anomalias, está implementada e validada localmente na branch `feat/react-anomaly-detection`, aguardando versionamento e integração à `main`. Investigações com IA e Relatórios no React permanecem como próximas etapas; recursos de agentes e relatórios já existem em outras partes do projeto, conforme documentado adiante.
 
 ## Visão geral
 
@@ -160,8 +160,25 @@ resumo. **Ver regra** apresenta o identificador original da validação.
 
 A aplicação distingue detalhes ausentes, lista vazia e filtros sem resultados.
 Substituir o CSV limpa o estado; falhar na reanálise do mesmo arquivo preserva o
-último resultado confirmado. ML continua **Não analisado** no React. Anomalias,
-Investigações e Relatórios possuem páginas de preparação, sem ações integradas.
+último resultado confirmado. Esse fluxo de qualidade está disponível na `main`.
+
+Na branch `feat/react-anomaly-detection`, a página **Detecção de Anomalias**
+também está implementada e validada localmente, ainda sem versionamento ou
+integração à `main`. Ela reutiliza o CSV da sessão e, somente ao clicar em
+**Executar análise de anomalias**, envia o campo multipart `file` para
+`POST /anomaly-analyses`. O backend utiliza um Isolation Forest previamente
+treinado, configurado no servidor por `LUCOPS_MODEL_PATH`, sem treinar durante
+as requisições. Consulte a [configuração local do modelo](#ml-na-api-e-no-dashboard).
+
+O dashboard de anomalias apresenta indicadores, distribuição normal/anômalo,
+tabela de resultados, scores completos e detalhes técnicos expansíveis, além
+dos motivos dos registros ignorados em uma seção separada. O percentual de
+anômalos considera apenas os registros avaliados; scores não representam
+probabilidade, severidade ou confirmação de fraude. ML permanece **Não analisado**
+até a execução explícita, e uma análise válida pode retornar zero anomalias.
+Qualidade e ML mantêm resultados independentes, descartados ao substituir o CSV.
+
+Investigações com IA e Relatórios continuam como páginas de preparação no React.
 O dashboard Streamlit continua disponível conforme as instruções adiante.
 Consulte [execução, contrato e validação do frontend](frontend/README.md).
 
@@ -318,7 +335,8 @@ Os testes verificam códigos HTTP e informações retornadas no JSON.
 
 - Integração com bancos de dados.
 - Pipelines de ingestão e transformação de dados.
-- Integração de Machine Learning, investigação e relatórios na interface React.
+- Versionamento e integração à `main` da Detecção de Anomalias já validada localmente na branch `feat/react-anomaly-detection`.
+- Integração de investigação com IA e relatórios na interface React.
 - Integração com serviços Cloud.
 - Containerização com Docker.
 - Evolução da interface web e dos recursos de observabilidade.
