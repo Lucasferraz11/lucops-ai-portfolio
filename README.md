@@ -12,7 +12,7 @@ Automatizar a validação de dados, identificar inconsistências e anomalias e a
 
 **Em desenvolvimento — Fases 1 a 6 concluídas; Fase 7 em andamento.**
 
-O projeto possui motor de qualidade, CLI, FastAPI, Machine Learning e investigação assistida por IA. Duas interfaces coexistem: o dashboard Streamlit, com qualidade, ML e investigação, e o frontend React. A Etapa 7.4 está concluída e integrada à `main`, com Visão Geral e Qualidade dos Dados funcionando no React. A Etapa 7.5, Detecção de Anomalias, está implementada e validada localmente na branch `feat/react-anomaly-detection`, aguardando versionamento e integração à `main`. Investigações com IA e Relatórios no React permanecem como próximas etapas; recursos de agentes e relatórios já existem em outras partes do projeto, conforme documentado adiante.
+O projeto possui motor de qualidade, CLI, FastAPI, Machine Learning e investigação assistida por IA. Duas interfaces coexistem: o dashboard Streamlit, com qualidade, ML e investigação, e o frontend React. As Etapas 7.4 — Visão Geral e Qualidade dos Dados — e 7.5 — Detecção de Anomalias — estão concluídas e integradas à `main`, com as respectivas páginas React funcionais. Investigações com IA e Relatórios no React permanecem como próximas etapas; recursos de agentes e relatórios já existem em outras partes do projeto, conforme documentado adiante.
 
 ## Visão geral
 
@@ -139,7 +139,7 @@ Para acessar a documentação interativa Swagger UI:
 
 `http://127.0.0.1:8000/docs`
 
-### Interface React — Visão Geral e Qualidade dos Dados
+### Interface React — Visão Geral, Qualidade dos Dados e Detecção de Anomalias
 
 Com a FastAPI em execução no terminal 1, abra outro terminal na raiz do projeto.
 Use Node.js compatível com Vite 6 e o lockfile existente para instalar o frontend:
@@ -162,9 +162,8 @@ A aplicação distingue detalhes ausentes, lista vazia e filtros sem resultados.
 Substituir o CSV limpa o estado; falhar na reanálise do mesmo arquivo preserva o
 último resultado confirmado. Esse fluxo de qualidade está disponível na `main`.
 
-Na branch `feat/react-anomaly-detection`, a página **Detecção de Anomalias**
-também está implementada e validada localmente, ainda sem versionamento ou
-integração à `main`. Ela reutiliza o CSV da sessão e, somente ao clicar em
+A página **Detecção de Anomalias**, concluída na Etapa 7.5 e integrada à `main`,
+reutiliza o CSV da sessão e, somente ao clicar em
 **Executar análise de anomalias**, envia o campo multipart `file` para
 `POST /anomaly-analyses`. O backend utiliza um Isolation Forest previamente
 treinado, configurado no servidor por `LUCOPS_MODEL_PATH`, sem treinar durante
@@ -335,7 +334,6 @@ Os testes verificam códigos HTTP e informações retornadas no JSON.
 
 - Integração com bancos de dados.
 - Pipelines de ingestão e transformação de dados.
-- Versionamento e integração à `main` da Detecção de Anomalias já validada localmente na branch `feat/react-anomaly-detection`.
 - Integração de investigação com IA e relatórios na interface React.
 - Integração com serviços Cloud.
 - Containerização com Docker.
