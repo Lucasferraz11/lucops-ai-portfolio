@@ -21,6 +21,9 @@ def load_csv(
         if not reader.fieldnames:
             raise ValueError("CSV file must contain a header.")
 
+        if len(reader.fieldnames) != len(set(reader.fieldnames)):
+            raise ValueError("CSV contains duplicate column names.")
+
         missing_columns = sorted(set(required_columns or []) - set(reader.fieldnames))
 
         if missing_columns:

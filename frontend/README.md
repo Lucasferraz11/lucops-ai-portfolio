@@ -1,61 +1,29 @@
-# Frontend LucOps AI — Fase 7, Etapa 7.6 (integração inicial)
+# Frontend LucOps AI — Fase 7, Entrega 7.7.2 (Relatórios e PDF)
 
-Interface React + TypeScript com Vite, Tailwind CSS e React Router em modo declarativo. Visão Geral e Qualidade dos Dados apresentam os indicadores e as inconsistências reais retornados por `POST /analyses`. Os resultados e o arquivo selecionado permanecem apenas na memória da sessão. O dashboard Streamlit continua disponível e documentado no [README principal](../README.md#analytics--dashboard).
+Interface React + TypeScript com Vite, Tailwind CSS e React Router em modo declarativo. Visão Geral e Qualidade dos Dados apresentam os indicadores e as inconsistências reais retornados por `POST /analyses`. Os resultados e o arquivo selecionado permanecem apenas na memória da sessão. O dashboard Streamlit continua disponível e documentado no [guia de desenvolvimento](../docs/development.md#interface-streamlit).
 
 ## Desenvolvimento local
 
-Requer Node.js compatível com o Vite 6 (a implementação foi validada com Node 22.4.0).
+Consulte o [guia de desenvolvimento](../docs/development.md) para pré-requisitos,
+instalação, execução da FastAPI e React, configuração do modelo, testes e CI.
+O [README principal](../README.md) oferece um início rápido, e a
+[arquitetura](../docs/architecture.md) descreve os módulos e contratos HTTP.
 
-```powershell
-# Terminal 1, na raiz do repositório (ambiente Python já configurado)
-.\.venv\Scripts\python.exe -m uvicorn lucops.api:app --reload
-```
+O Vite encaminha `/health`, `/analyses`, `/anomaly-analyses` e `/investigations`
+para a API local. A sidebar consulta `/health` ao abrir e a cada 30 segundos,
+com prazo de 5 segundos; isso não verifica disponibilidade de ML ou OpenAI.
+As análises têm limite de 30 segundos, incluindo a leitura do corpo. Uma falha
+vazia do proxy pode ser diferenciada de erro do backend pela consulta a `/health`.
 
-```powershell
-# Terminal 2, na raiz do repositório
-cd frontend
-npm.cmd ci
-npm.cmd run dev
-```
-
-Abra `http://localhost:5173`, selecione ou arraste um CSV e clique em **Analisar qualidade**. Durante o desenvolvimento, o Vite encaminha `/health`, `/analyses`, `/anomaly-analyses` e `/investigations` para `http://127.0.0.1:8000`; o navegador usa requisições de mesma origem. Para outra configuração de publicação, `VITE_API_BASE_URL` pode definir a URL-base do cliente, desde que haja um proxy de mesma origem ou CORS autorizado pelo servidor. No PowerShell desta máquina, `npm.cmd` evita o bloqueio de execução do shim `npm.ps1`.
-
-O formulário envia `FormData` com os campos `file` e `include_details=true`, na mesma requisição. A API retorna `quality_status`, `summary` (`total_records`, `valid_records`, `invalid_records`, `total_issues`, `valid_percentage`) e, quando disponível, `details`. A análise de qualidade não calcula anomalias: o respectivo indicador permanece **Não analisado** até uma execução explícita de ML. A seleção de outro CSV descarta resultados anteriores e cancela as requisições de qualidade, ML e investigação em andamento.
-
-A sidebar consulta `/health` ao abrir e a cada 30 segundos, mostrando apenas a disponibilidade da FastAPI para análises. Isso não verifica ML nem OpenAI. Uma reanálise malsucedida do mesmo arquivo conserva o último resultado confirmado e o identifica como anterior; ao substituir o CSV, esse resultado é descartado. A verificação de conexão tem limite de 5 segundos e a análise de 30 segundos, incluindo a leitura completa do corpo da resposta. Durante o desenvolvimento, uma falha de conexão do proxy do Vite pode chegar como HTTP 500 vazio; o cliente consulta `/health` para distingui-la de um HTTP 500 retornado pelo backend.
-
-```powershell
-npm.cmd run build
-npm.cmd run lint
-npm.cmd test
-```
-
-### CI automático no GitHub Actions
-
-O workflow [Frontend CI](../.github/workflows/frontend-ci.yml) executa em pushes
-para `main` e `feat/**`, além de pull requests destinados à `main`, sem filtros
-de caminho. Em um runner Ubuntu com Node 22.x, instala as dependências com
-`npm ci` e executa `npm run test`, `npm run lint` e `npm run build` dentro de
-`frontend/`. O build inclui a verificação TypeScript (`tsc -b`). O cache npm usa
-`frontend/package-lock.json`.
-
-Os comandos acima validam o frontend localmente; a automação executa no GitHub
-somente depois do envio da branch ou da abertura/atualização do PR. Os testes
-usam mocks e JSDOM e não precisam de FastAPI ou Vite ativos. O workflow tem
-apenas permissão de leitura, não usa segredos nem realiza deploy. O CI Python
-continua independente em `.github/workflows/ci.yml`.
-
-Para executar a suíte Python completa, a partir da raiz, use o ambiente com os extras `dev`, `dashboard` e `ml` instalados:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest -q
-```
-
-Os cinco links do menu funcionam. A Visão Geral e a página Qualidade dos Dados mostram os agregados reais do CSV atual, incluindo um gráfico de rosca calculado a partir de registros válidos e inválidos. Detecção de Anomalias oferece execução explícita, indicadores, distribuição e resultados por registro. Investigações com IA está integrada nesta branch ao provedor simulado; Relatórios continua como página de preparação. A integração da Etapa 7.6 aguarda validação manual, versionamento e merge.
+A Visão Geral e Qualidade dos Dados usam `POST /analyses` com `file` e
+`include_details=true`. Os filtros locais abrangem os detalhes recebidos,
+limitados a 200 ocorrências; indicadores e totais continuam cobrindo o CSV inteiro.
+O ML permanece **Não analisado** até uma execução explícita.
+As cinco rotas são funcionais nesta branch; os testes usam mocks e JSDOM.
 
 ## Investigações com IA — Etapa 7.6
 
-Na branch `feat/react-ai-investigations`, acesse `/investigacoes` após selecionar um CSV na Visão Geral. Informe o **Índice do registro**, começando em 1 e sem contar o cabeçalho, e clique em **Investigar com IA**. Qualidade e ML não precisam ter sido executados no frontend: o servidor prepara novamente o contexto a partir do arquivo. Se houver resultados anteriores na sessão, seus índices alimentam atalhos de seleção e suas contagens delimitam o índice; esses atalhos não enviam scores ou indicadores como evidências. A lista de atalhos abrange somente os registros presentes nos resultados recebidos, que podem ser parciais no caso dos detalhes de qualidade.
+A Etapa 7.6 foi concluída e integrada à `main`. Acesse `/investigacoes` após selecionar um CSV na Visão Geral. Informe o **Índice do registro**, começando em 1 e sem contar o cabeçalho, e clique em **Investigar com IA**. Qualidade e ML não precisam ter sido executados no frontend: o servidor prepara novamente o contexto a partir do arquivo. Se houver resultados anteriores na sessão, seus índices alimentam atalhos de seleção e suas contagens delimitam o índice; esses atalhos não enviam scores ou indicadores como evidências. A lista de atalhos abrange somente os registros presentes nos resultados recebidos, que podem ser parciais no caso dos detalhes de qualidade.
 
 ### Contrato e segurança
 
@@ -82,7 +50,36 @@ Para conferir no desktop com a API e o Vite em execução:
 3. Confira evidências, hipóteses, recomendações, limitações e referências completas nos detalhes. Sem modelo configurado, a investigação deve continuar mostrando ML indisponível.
 4. Troque o índice e o CSV: nenhum resultado anterior deve permanecer associado à nova seleção. Confira também `transacoes_invalidas.csv`, erros de índice e preservação da qualidade/ML.
 
-Os testes usam mocks e dados sintéticos, sem API ativa ou chamadas pagas. A aparência final ainda requer a primeira validação manual no desktop; esta entrega não exige uma nova rodada obrigatória de testes em tablet e celular. OpenAI no React, Relatórios, autenticação, banco de dados e deploy permanecem fora deste escopo.
+Os testes usam mocks e dados sintéticos, sem API ativa ou chamadas pagas. A investigação e a limpeza de resultados ao trocar o índice foram validadas manualmente no desktop durante a Etapa 7.6. OpenAI no React, autenticação, banco de dados e deploy permanecem fora deste escopo.
+
+## Relatórios da sessão e PDF — Entregas 7.7.1 e 7.7.2
+
+A página Relatórios reúne os resultados disponíveis da sessão React. A rota `/relatorios` lê diretamente o `AnalysisContext`, sem copiar resultados para outro estado nem enviar novas requisições de análise. A verificação de conexão `GET /health` existente continua independente.
+
+A página reúne o nome do CSV e os resultados confirmados disponíveis: resumo de qualidade de `POST /analyses` (total, válidos, inválidos, percentual e inconsistências); modelo, avaliados, ignorados e anomalias de `POST /anomaly-analyses`; registro selecionado, síntese dos fatos, contagens de evidências/interpretações e limitações de `POST /investigations`. Os links levam às páginas originais para consulta completa.
+
+O percentual de anômalos usa somente os registros avaliados como denominador. Sem avaliados, o percentual fica indisponível; zero anomalias após análise é diferente de ML não executado. O ML disponível no contexto de uma investigação específica não é promovido a resultado da análise de ML do lote. Nenhum score é interpretado como probabilidade, fraude ou severidade.
+
+Resultados ausentes, tentativas em andamento e falhas são identificados. Se uma atualização falhar, o último resultado confirmado é preservado e indicado como anterior. Trocar o CSV limpa o relatório; trocar o índice invalida somente a investigação. A sessão não mantém um histórico de investigações.
+
+Para validar no desktop, com FastAPI e Vite iniciados conforme o guia de desenvolvimento:
+
+1. Abra `http://localhost:5173/relatorios` sem CSV e confira o estado vazio.
+2. Selecione um CSV na Visão Geral e volte a Relatórios: as análises ainda não executadas devem estar identificadas.
+3. Execute qualidade, ML e investigação nas respectivas páginas e retorne a Relatórios para conferir os números e o registro selecionado.
+4. Troque o CSV e confira que os resultados anteriores desapareceram.
+
+Não há Excel, download de CSV, assinatura de relatório ou persistência nesta entrega. O relatório textual de qualidade já disponível na CLI Python permanece independente; nenhum endpoint foi criado. A aparência do arquivo gerado pode ser conferida pelo roteiro de exportação abaixo.
+
+### Exportação PDF local — Entrega 7.7.2
+
+Com um CSV selecionado, clique em **Exportar PDF** em Relatórios. O jsPDF é carregado sob demanda e gera um documento A4 com nome seguro (`lucops-relatorio-<arquivo>.pdf`), data/hora reais de geração em America/Sao_Paulo, margens, cabeçalho e paginação. O botão fica indisponível durante a geração; falhas exibem uma mensagem e permitem nova tentativa. A conclusão indica que o download foi iniciado, sujeito aos controles do navegador.
+
+O PDF executivo usa uma fotografia dos resultados disponíveis ao solicitar a exportação: resumo de negócio, cards, rosca vetorial de qualidade (válidos/inválidos) e rosca vetorial de ML (normais/anômalos, excluindo ignorados). Inclui registro investigado, fatos verificados, quantidade de evidências, possibilidades explicitamente não confirmadas, recomendações e limitações relevantes em linguagem acessível. O PDF seleciona até cinco limitações executivas, priorizando ausência de histórico e contexto externo, causas não confirmadas e limites estatísticos. Repetições e detalhes internos de cálculo ficam fora dessa seleção; os textos originais permanecem intactos na sessão e consultáveis na interface React. Títulos e conteúdo inicial são medidos juntos; hipóteses e recomendações pequenas permanecem no mesmo bloco. Quando cabe em uma página, a interpretação é redistribuída como um conjunto para equilibrar a segunda página, sem reduzir as fontes. Evidências individuais, referências completas, funções, scores e dados técnicos permanecem na interface React. Seções sem resultado, resultados zero e últimas análises preservadas após falhas são identificados separadamente. Sem dados para uma distribuição, não é desenhada uma rosca fictícia.
+
+Não há novas análises, chamadas a OpenAI, upload, impressão da página ou envio de dados a terceiros. O arquivo é gerado somente pela ação do usuário e pode conter informações da análise. A fonte Noto Sans é incorporada ao módulo de exportação, sem buscar fontes externas em execução; sua origem e licença SIL OFL 1.1 estão em [src/assets/fonts/README.md](src/assets/fonts/README.md). Acentos e pontuação são preservados; caracteres sem glifo ou controles invisíveis são representados explicitamente por `[U+XXXX]`, com nota no documento, sem cortes silenciosos de textos extensos.
+
+Para validar, execute as análises desejadas nas páginas existentes, volte a Relatórios, clique em **Exportar PDF** e abra o arquivo baixado. Confira nome do CSV, totais, data, cards, duas roscas, recomendações e limitações. Para o cenário com 5 válidos, 0 inválidos, 4 normais e 1 anômalo, a cobertura automatizada verifica um documento de até duas páginas. Textos extensos de negócio podem exigir mais páginas; não são cortados para impor esse limite. Consulte as evidências e referências completas na aplicação. Repita somente com qualidade, sem análises, com zero anomalias e após substituir o CSV.
 
 ## Anomalias — integração e dashboard (7.5.1–7.5.3)
 
@@ -123,23 +120,10 @@ Uma falha ao repetir a análise do mesmo arquivo preserva o último resultado co
 
 ### Modelo local e validação manual
 
-Use somente o artefato confiável gerado pelo projeto e mantenha o `.joblib` junto do `.joblib.json`, com a versão de Scikit-learn usada no treino. No terminal que inicia a FastAPI, na raiz:
-
-```powershell
-$env:LUCOPS_AGENT_OPENAI_MAX_CALLS = '0'
-$env:LUCOPS_MODEL_PATH = (Resolve-Path models/isolation_forest.joblib).Path
-.\.venv\Scripts\python.exe -m uvicorn lucops.api:app --reload
-```
-
-Se a API já estiver em execução, encerre-a no terminal original antes de reiniciar com essa configuração. Definir a variável em outro terminal não configura o processo existente. O modelo é carregado na primeira inferência e reutilizado por processo/caminho; reinicie a API se substituir o artefato. A existência do arquivo sozinha não garante compatibilidade: o backend valida os metadados e a integridade ao carregá-lo.
-
-Se não houver artefato, siga o procedimento de [treinamento local já documentado](../README.md#machine-learning-comandos-locais), em uma ação separada e consciente. Por exemplo, apenas quando necessário e sem sobrescrever um modelo existente:
-
-```powershell
-.\.venv\Scripts\python.exe -m lucops.ml train data/sample/transacoes.csv --model models/isolation_forest.joblib --model-version iforest-v1
-```
-
-Esta entrega não instala dependências nem treina, baixa ou substitui modelos automaticamente.
+A [configuração do modelo local](../docs/development.md#modelo-local-de-ml)
+concentra treinamento explícito, artefatos confiáveis, `LUCOPS_MODEL_PATH`,
+compatibilidade e reinício da API. Nenhum modelo é treinado ou substituído
+automaticamente. Mantenha as chamadas externas bloqueadas conforme o guia.
 
 Para a revisão manual:
 

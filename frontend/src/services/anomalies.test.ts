@@ -71,3 +71,53 @@ describe('cliente de anomalias', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 })
+
+
+describe('consistencia dos resultados de ML', () => {
+  it.each([
+    { ...result, results: [{ ...result.results[0], anomaly_score: 0, is_anomaly: false }], anomalies_detected: 0 },
+    { ...result, results: [{ ...result.results[0], anomaly_score: -0.2, is_anomaly: false }], anomalies_detected: 0 },
+    { ...result, evaluated_records: 2, skipped_records: 0, anomalies_detected: 1, ineligible: [], results: [
+      { ...result.results[0], record_index: 2 },
+      { ...result.results[0], record_index: 1, anomaly_score: -2, is_anomaly: false },
+    ] },
+    { ...result, evaluated_records: 0, skipped_records: 1, anomalies_detected: 0, results: [], ineligible: [
+      { ...result.ineligible[0], record_index: 1 },
+    ] },
+  ])('aceita zero, score sem limite arbitrario e IDs repetidos com indices distintos %#', async (payload) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(payload)))
+    expect(await createAnomalyAnalysis(file)).toEqual(payload)
+  })
+
+  it.each([
+    ...['evaluated_records', 'skipped_records', 'anomalies_detected'].flatMap((field) =>
+      [-1, 0.5, Number.MAX_SAFE_INTEGER + 1].map((value) => ({ ...result, [field]: value }))),
+    { ...result, results: [{ ...result.results[0], record_index: 1.5 }] },
+    { ...result, ineligible: [{ ...result.ineligible[0], record_index: 0 }] },
+    { ...result, ineligible: [{ ...result.ineligible[0], record_index: 1.5 }] },
+    { ...result, ineligible: [{ ...result.ineligible[0], record_index: 1 }] },
+    { ...result, evaluated_records: 2, anomalies_detected: 2, results: [result.results[0], result.results[0]] },
+    { ...result, skipped_records: 2, ineligible: [result.ineligible[0], result.ineligible[0]] },
+    { ...result, results: [{ ...result.results[0], anomaly_score: 0 }] },
+    { ...result, results: [{ ...result.results[0], anomaly_score: -0.1 }] },
+    { ...result, results: [{ ...result.results[0], is_anomaly: false }], anomalies_detected: 0 },
+    { ...result, ineligible: [{ ...result.ineligible[0], issues: [] }] },
+    { ...result, model_version: '   ' },
+  ])('rejeita contagens, indices ou classificacoes incoerentes %#', async (payload) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(payload)))
+    await expect(createAnomalyAnalysis(file)).rejects.toMatchObject({ kind: 'response' })
+  })
+
+  it.each(['evaluated_records', 'skipped_records', 'anomalies_detected', 'score', 'index'])(
+    'rejeita numero nao finito em %s', async (field) => {
+      const payload = field === 'score'
+        ? { ...result, results: [{ ...result.results[0], anomaly_score: 'OVERFLOW' }] }
+        : field === 'index'
+          ? { ...result, results: [{ ...result.results[0], record_index: 'OVERFLOW' }] }
+          : { ...result, [field]: 'OVERFLOW' }
+      const body = JSON.stringify(payload).replace('"OVERFLOW"', '1e400')
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status: 200 })))
+      await expect(createAnomalyAnalysis(file)).rejects.toMatchObject({ kind: 'response' })
+    },
+  )
+})

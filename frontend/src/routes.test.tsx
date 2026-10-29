@@ -41,9 +41,9 @@ describe('navegação inicial', () => {
     expect(html).not.toContain('API Conectada')
   })
 
-  it('apresenta um estado de preparação nas demais páginas', () => {
+  it('apresenta estados vazios nas páginas sem análise', () => {
     expect(renderPath('/qualidade')).toContain('Nenhuma análise de qualidade disponível')
-    expect(renderPath('/relatorios')).toContain('Página em preparação')
+    expect(renderPath('/relatorios')).toContain('Nenhum CSV selecionado')
   })
 
   it('expõe o estado do menu móvel e fecha a navegação após escolher a rota', () => {

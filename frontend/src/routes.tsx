@@ -5,6 +5,7 @@ import { PreparationPage } from './pages/PreparationPage'
 import { QualityPage } from './pages/QualityPage'
 import { AnomaliesPage } from './pages/AnomaliesPage'
 import { InvestigationsPage } from './pages/InvestigationsPage'
+import { ReportsPage } from './pages/ReportsPage'
 
 export function AppRoutes() {
   return (
@@ -14,16 +15,7 @@ export function AppRoutes() {
         <Route path="qualidade" element={<QualityPage />} />
         <Route path="anomalias" element={<AnomaliesPage />} />
         <Route path="investigacoes" element={<InvestigationsPage />} />
-        <Route
-          path="relatorios"
-          element={
-            <PreparationPage
-              title="Relatórios"
-              description="Os resultados disponíveis para relatório aparecerão aqui."
-              icon="reports"
-            />
-          }
-        />
+        <Route path="relatorios" element={<ReportsPage />} />
         <Route
           path="*"
           element={

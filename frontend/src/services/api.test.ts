@@ -206,3 +206,55 @@ describe('cliente da FastAPI', () => {
     expect(vi.getTimerCount()).toBe(0)
   })
 })
+
+
+describe('consistencia do resumo de qualidade', () => {
+  const mixed = {
+    quality_status: 'COM INCONSISTÊNCIAS',
+    summary: { total_records: 3, valid_records: 1, invalid_records: 2, total_issues: 4, valid_percentage: 33.33 },
+  }
+
+  it.each([
+    result,
+    mixed,
+    { ...mixed, summary: { ...mixed.summary, valid_records: 2, invalid_records: 1, valid_percentage: 66.67 } },
+    { quality_status: 'SEM DADOS', summary: { total_records: 0, valid_records: 0, invalid_records: 0, total_issues: 0, valid_percentage: null } },
+    { ...mixed, summary: { ...mixed.summary, valid_records: 0, invalid_records: 3, valid_percentage: 0 } },
+    { ...mixed, summary: { total_records: 100000, valid_records: 1, invalid_records: 99999, total_issues: 99999, valid_percentage: 0 } },
+    { ...mixed, details: { items: [
+      { record_index: 2, field: 'valor', rule: 'is_positive_amount', description: 'Valor invalido' },
+      { record_index: 2, field: 'cliente_id', rule: 'campo obrigatorio', description: 'Campo ausente' },
+    ], returned_issues: 2, total_issues: 4, limit: 200, truncated: true, record_index_base: 1 } },
+  ])('preserva resposta valida, arredondamento e multiplas ocorrencias %#', async (payload) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(payload)))
+    expect(await createAnalysis(csv)).toEqual(payload)
+  })
+
+  it.each([
+    ...['total_records', 'valid_records', 'invalid_records', 'total_issues'].flatMap((field) =>
+      [-1, 0.5, Number.MAX_SAFE_INTEGER + 1].map((value) => ({ ...mixed, summary: { ...mixed.summary, [field]: value } }))),
+    ...[-0.01, 100.01, 50, null, '33.33'].map((valid_percentage) =>
+      ({ ...mixed, summary: { ...mixed.summary, valid_percentage } })),
+    { ...mixed, summary: { ...mixed.summary, total_records: 4 } },
+    { ...mixed, summary: { ...mixed.summary, total_issues: 1 } },
+    { ...result, summary: { ...result.summary, total_issues: 1 } },
+    { ...mixed, quality_status: 'SEM INCONSISTÊNCIAS' },
+    { ...result, quality_status: 'SEM DADOS' },
+    { quality_status: 'SEM DADOS', summary: { total_records: 0, valid_records: 0, invalid_records: 0, total_issues: 0, valid_percentage: 0 } },
+    { ...mixed, details: { items: [
+      { record_index: 4, field: 'valor', rule: 'is_positive_amount', description: 'Valor invalido' },
+    ], returned_issues: 1, total_issues: 4, limit: 200, truncated: true, record_index_base: 1 } },
+  ])('rejeita resumo ou detalhes incoerentes %#', async (payload) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json(payload)))
+    await expect(createAnalysis(csv)).rejects.toMatchObject({ kind: 'response' })
+  })
+
+  it.each(['total_records', 'valid_records', 'invalid_records', 'total_issues', 'valid_percentage'])(
+    'rejeita numero nao finito recebido em JSON: %s', async (field) => {
+      const payload = { ...mixed, summary: { ...mixed.summary, [field]: 'OVERFLOW' } }
+      const body = JSON.stringify(payload).replace('"OVERFLOW"', '1e400')
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status: 200 })))
+      await expect(createAnalysis(csv)).rejects.toMatchObject({ kind: 'response' })
+    },
+  )
+})

@@ -40,7 +40,7 @@ export function UploadPanel() {
         onDragLeave={(event) => { event.preventDefault(); setDragging(false) }}
         onDrop={onDrop}
       >
-        <Icon name="upload" className="mx-auto h-9 w-9 text-primary" />
+        <Icon name="upload" className="upload-icon-float mx-auto h-9 w-9 text-primary" />
         <p className="mt-3 font-display text-sm font-semibold text-ink">
           {selectedFile ? 'Arquivo selecionado' : 'Arraste um arquivo CSV para cá'}
         </p>
@@ -63,9 +63,9 @@ export function UploadPanel() {
           {isAnalyzing ? 'Analisando...' : 'Analisar qualidade'}
         </button>
       </div>
-      {error && <p role="alert" className="mt-4 rounded-md border border-[#ffb4ab]/40 bg-[#93000a]/20 px-4 py-3 text-sm text-[#ffb4ab]">{analysis ? `A atualização falhou: ${error} Os resultados exibidos pertencem à última análise concluída deste arquivo.` : error}</p>}
-      {analysis && !error && !isAnalyzing && <p role="status" className="mt-4 rounded-md border border-positive/40 bg-positive/10 px-4 py-3 text-sm text-positive">Análise de qualidade concluída para {selectedFile?.name}.</p>}
-      {analysis && isAnalyzing && <p role="status" className="mt-4 rounded-md border border-primary/40 bg-primary/10 px-4 py-3 text-sm text-primary">Atualizando análise. O resultado anterior permanece visível até a conclusão.</p>}
+      {error && <p role="alert" className="mt-4 break-words rounded-md border border-[#ffb4ab]/40 bg-[#93000a]/20 px-4 py-3 text-sm text-[#ffb4ab]">{analysis ? `A atualização falhou: ${error} Os resultados exibidos pertencem à última análise concluída deste arquivo.` : error}</p>}
+      {analysis && !error && !isAnalyzing && <p role="status" className="mt-4 break-words rounded-md border border-positive/40 bg-positive/10 px-4 py-3 text-sm text-positive">Análise de qualidade concluída para {selectedFile?.name}.</p>}
+      {analysis && isAnalyzing && <p role="status" className="mt-4 break-words rounded-md border border-primary/40 bg-primary/10 px-4 py-3 text-sm text-primary">Atualizando análise. O resultado anterior permanece visível até a conclusão.</p>}
     </>
   )
 }
