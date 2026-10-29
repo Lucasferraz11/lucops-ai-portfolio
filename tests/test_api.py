@@ -1,3 +1,6 @@
+import csv
+
+import pytest
 from fastapi.testclient import TestClient
 
 from lucops.api import app
@@ -67,3 +70,58 @@ def test_create_analysis_rejects_missing_columns():
     assert response.json() == {
         "detail": ("CSV inválido: Missing required CSV columns: cliente_id")
     }
+
+
+@pytest.mark.parametrize("include_details", ["false", "true"])
+def test_create_analysis_rejects_duplicate_headers_safely(include_details):
+    content = b"id_transacao,cliente_id,valor,valor\nT1,C1,-10,100\n"
+    response = client.post(
+        "/analyses",
+        data={"include_details": include_details},
+        files={"file": ("input.csv", content)},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "CSV inválido: CSV contains duplicate column names."
+    }
+
+
+@pytest.mark.parametrize("include_details", ["false", "true"])
+def test_create_analysis_handles_real_parser_error(include_details):
+    content = (
+        "id_transacao,cliente_id,valor\n"
+        + "PRIVATE_MARKER_"
+        + "x" * csv.field_size_limit()
+        + ",C1,10\n"
+    ).encode()
+    response = client.post(
+        "/analyses",
+        data={"include_details": include_details},
+        files={"file": ("input.csv", content)},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "CSV inválido."}
+
+
+def test_create_analysis_does_not_expose_parser_exception_and_removes_upload(
+    monkeypatch,
+):
+    uploads = []
+
+    def fail_analysis(**kwargs):
+        uploads.append(kwargs["file_path"])
+        assert uploads[-1].exists()
+        raise csv.Error("PRIVATE_MARKER /private/server/path")
+
+    monkeypatch.setattr("lucops.api.analyze_csv", fail_analysis)
+    response = client.post(
+        "/analyses",
+        files={"file": ("input.csv", b"id_transacao,cliente_id,valor\nT1,C1,10\n")},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "CSV inválido."}
+    assert len(uploads) == 1
+    assert not uploads[0].parent.exists()

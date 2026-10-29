@@ -119,3 +119,48 @@ def test_load_csv_rejects_missing_values(tmp_path: Path):
         match="CSV record 3 has fewer values than columns",
     ):
         load_csv(csv_file)
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        "id_transacao,cliente_id,valor,valor",
+        "id_transacao,cliente_id,valor,id_transacao",
+        "id_transacao,cliente_id,valor,cliente_id",
+        "id_transacao,cliente_id,valor,private@example.test,private@example.test",
+    ],
+)
+@pytest.mark.parametrize("has_record", [False, True])
+def test_load_csv_rejects_duplicate_headers_without_exposing_names(
+    tmp_path, header, has_record
+):
+    path = tmp_path / "duplicate.csv"
+    path.write_text(
+        header + ("\nT1,C1,-10,100" if has_record else "\n"), encoding="utf-8-sig"
+    )
+
+    with pytest.raises(ValueError) as error:
+        load_csv(path, required_columns=("id_transacao", "cliente_id", "valor"))
+
+    assert str(error.value) == "CSV contains duplicate column names."
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-8-sig"])
+def test_load_csv_preserves_valid_distinct_headers_and_quoted_values(
+    tmp_path, encoding
+):
+    path = tmp_path / "valid.csv"
+    path.write_text(
+        'id_transacao,cliente_id,valor,Valor,nota\nT1,C1,10.00,20.00,"a,b"\n',
+        encoding=encoding,
+    )
+
+    assert load_csv(path, required_columns=("id_transacao", "cliente_id", "valor")) == [
+        {
+            "id_transacao": "T1",
+            "cliente_id": "C1",
+            "valor": "10.00",
+            "Valor": "20.00",
+            "nota": "a,b",
+        }
+    ]

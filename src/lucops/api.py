@@ -59,6 +59,8 @@ def create_analysis(
                 unique_fields=["id_transacao"],
                 include_validation_results=include_details,
             )
+        except csv.Error as exc:
+            raise HTTPException(status_code=400, detail="CSV inválido.") from exc
         except ValueError as exc:
             raise HTTPException(
                 status_code=400,

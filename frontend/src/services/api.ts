@@ -80,11 +80,11 @@ function isNonnegativeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
 }
 
-function isAnalysisDetails(value: unknown, totalIssues: number): value is AnalysisDetails {
+function isAnalysisDetails(value: unknown, totalIssues: number, totalRecords: number): value is AnalysisDetails {
   if (!isRecord(value) || !Array.isArray(value.items)) return false
   return (
     value.items.every((item) => isRecord(item) &&
-      isNonnegativeInteger(item.record_index) && item.record_index >= 1 &&
+      isNonnegativeInteger(item.record_index) && item.record_index >= 1 && item.record_index <= totalRecords &&
       typeof item.field === 'string' && typeof item.rule === 'string' && typeof item.description === 'string') &&
     isNonnegativeInteger(value.returned_issues) &&
     value.returned_issues === value.items.length &&
@@ -101,15 +101,28 @@ function isAnalysisDetails(value: unknown, totalIssues: number): value is Analys
 function isAnalysisResponse(value: unknown): value is AnalysisResponse {
   if (!isRecord(value) || !isRecord(value.summary)) return false
   const summary = value.summary
-  return (
-    (value.quality_status === 'SEM DADOS' || value.quality_status === 'COM INCONSISTÊNCIAS' || value.quality_status === 'SEM INCONSISTÊNCIAS') &&
-    typeof summary.total_records === 'number' &&
-    typeof summary.valid_records === 'number' &&
-    typeof summary.invalid_records === 'number' &&
-    typeof summary.total_issues === 'number' &&
-    (typeof summary.valid_percentage === 'number' || summary.valid_percentage === null) &&
-    (!('details' in value) || isAnalysisDetails(value.details, summary.total_issues as number))
-  )
+  if (!isNonnegativeInteger(summary.total_records) ||
+    !isNonnegativeInteger(summary.valid_records) ||
+    !isNonnegativeInteger(summary.invalid_records) ||
+    !isNonnegativeInteger(summary.total_issues) ||
+    summary.valid_records + summary.invalid_records !== summary.total_records ||
+    summary.total_issues < summary.invalid_records ||
+    (summary.invalid_records === 0 && summary.total_issues !== 0)) return false
+
+  if (summary.total_records === 0) {
+    if (summary.valid_percentage !== null || value.quality_status !== 'SEM DADOS') return false
+  } else {
+    if (typeof summary.valid_percentage !== 'number' || !Number.isFinite(summary.valid_percentage) ||
+      summary.valid_percentage < 0 || summary.valid_percentage > 100) return false
+    // The backend rounds to two decimals. Compare within half a cent of percentage,
+    // allowing floating-point noise; never replace the server's reported value.
+    if (Math.abs(summary.valid_percentage - summary.valid_records / summary.total_records * 100) >
+      0.005 + Number.EPSILON * 100) return false
+    const expectedStatus = summary.invalid_records > 0 ? 'COM INCONSISTÊNCIAS' : 'SEM INCONSISTÊNCIAS'
+    if (value.quality_status !== expectedStatus) return false
+  }
+
+  return !('details' in value) || isAnalysisDetails(value.details, summary.total_issues, summary.total_records)
 }
 
 function isAnomalyAnalysisResponse(value: unknown): value is AnomalyAnalysisResponse {
@@ -117,17 +130,22 @@ function isAnomalyAnalysisResponse(value: unknown): value is AnomalyAnalysisResp
   const hasIdentity = (item: unknown): item is Record<string, unknown> => isRecord(item) &&
     isNonnegativeInteger(item.record_index) && item.record_index >= 1 &&
     typeof item.transaction_id === 'string' && typeof item.original_value === 'string'
-  return typeof value.model_version === 'string' && value.model_version.length > 0 &&
+  if (!(typeof value.model_version === 'string' && value.model_version.trim().length > 0 &&
     isNonnegativeInteger(value.evaluated_records) && value.evaluated_records === value.results.length &&
     isNonnegativeInteger(value.skipped_records) && value.skipped_records === value.ineligible.length &&
     value.results.every((item) => hasIdentity(item) && typeof item.anomaly_score === 'number' &&
-      Number.isFinite(item.anomaly_score) && typeof item.is_anomaly === 'boolean') &&
-    value.ineligible.every((item) => hasIdentity(item) && Array.isArray(item.issues) && item.issues.every(
+      Number.isFinite(item.anomaly_score) && typeof item.is_anomaly === 'boolean' &&
+      item.is_anomaly === (item.anomaly_score > 0)) &&
+    value.ineligible.every((item) => hasIdentity(item) && Array.isArray(item.issues) && item.issues.length > 0 && item.issues.every(
       (issue) => isRecord(issue) && typeof issue.field === 'string' && typeof issue.message === 'string' &&
         'value' in issue && 'expected' in issue,
     )) &&
     isNonnegativeInteger(value.anomalies_detected) &&
-    value.anomalies_detected === value.results.filter((item) => item.is_anomaly === true).length
+    value.anomalies_detected === value.results.filter((item) => item.is_anomaly === true).length)) return false
+
+  // A CSV record belongs to exactly one group, even when transaction IDs repeat.
+  const indices = [...value.results, ...value.ineligible].map((item) => item.record_index)
+  return new Set(indices).size === indices.length
 }
 
 export async function request(path: '/health' | '/analyses' | '/anomaly-analyses' | '/investigations', options?: RequestInit): Promise<unknown> {

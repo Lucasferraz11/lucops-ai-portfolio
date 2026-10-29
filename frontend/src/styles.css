@@ -45,3 +45,20 @@ a {
 .font-mono {
   font-feature-settings: "tnum" 1, "cv05" 1, "zero" 1;
 }
+
+@keyframes upload-icon-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* Opt in to motion only when the user's preference allows it. */
+@media (prefers-reduced-motion: no-preference) {
+  .upload-icon-float {
+    animation: upload-icon-float 3s ease-in-out infinite;
+  }
+}
