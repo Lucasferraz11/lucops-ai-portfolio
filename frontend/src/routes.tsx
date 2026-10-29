@@ -4,6 +4,7 @@ import { OverviewPage } from './pages/OverviewPage'
 import { PreparationPage } from './pages/PreparationPage'
 import { QualityPage } from './pages/QualityPage'
 import { AnomaliesPage } from './pages/AnomaliesPage'
+import { InvestigationsPage } from './pages/InvestigationsPage'
 
 export function AppRoutes() {
   return (
@@ -12,16 +13,7 @@ export function AppRoutes() {
         <Route index element={<OverviewPage />} />
         <Route path="qualidade" element={<QualityPage />} />
         <Route path="anomalias" element={<AnomaliesPage />} />
-        <Route
-          path="investigacoes"
-          element={
-            <PreparationPage
-              title="Investigações com IA"
-              description="Evidências, hipóteses e recomendações serão exibidas após a integração."
-              icon="investigations"
-            />
-          }
-        />
+        <Route path="investigacoes" element={<InvestigationsPage />} />
         <Route
           path="relatorios"
           element={

@@ -130,7 +130,7 @@ function isAnomalyAnalysisResponse(value: unknown): value is AnomalyAnalysisResp
     value.anomalies_detected === value.results.filter((item) => item.is_anomaly === true).length
 }
 
-async function request(path: '/health' | '/analyses' | '/anomaly-analyses', options?: RequestInit): Promise<unknown> {
+export async function request(path: '/health' | '/analyses' | '/anomaly-analyses' | '/investigations', options?: RequestInit): Promise<unknown> {
   const controller = new AbortController()
   const onAbort = () => controller.abort()
   options?.signal?.addEventListener('abort', onAbort, { once: true })

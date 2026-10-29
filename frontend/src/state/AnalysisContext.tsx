@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ApiError, createAnalysis, createAnomalyAnalysis, getHealth, type AnalysisResponse, type AnomalyAnalysisResponse } from '../services/api'
+import { createInvestigation, type InvestigationResult } from '../services/investigations'
 
 export type ApiStatus = 'checking' | 'connected' | 'unavailable'
 
@@ -11,6 +12,13 @@ interface AnomalyState {
 
 const initialAnomalyState: AnomalyState = { status: 'not-analyzed', result: null, error: null }
 
+interface InvestigationState {
+  status: 'not-executed' | 'loading' | 'success' | 'error'
+  result: InvestigationResult | null
+  error: string | null
+}
+const initialInvestigation: InvestigationState = { status: 'not-executed', result: null, error: null }
+
 interface AnalysisContextValue {
   selectedFile: File | null
   analysis: AnalysisResponse | null
@@ -21,6 +29,10 @@ interface AnalysisContextValue {
   analyze: () => Promise<void>
   anomaly: AnomalyState
   analyzeAnomalies: () => Promise<void>
+  investigation: InvestigationState
+  investigationIndex: string
+  selectInvestigationIndex: (value: string) => void
+  investigate: () => Promise<void>
 }
 
 const AnalysisContext = createContext<AnalysisContextValue | null>(null)
@@ -36,6 +48,9 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   const busy = useRef(false)
   const [anomaly, setAnomaly] = useState<AnomalyState>(initialAnomalyState)
   const anomalyRequest = useRef<AbortController | null>(null)
+  const [investigation, setInvestigation] = useState<InvestigationState>(initialInvestigation)
+  const [investigationIndex, setInvestigationIndex] = useState('1')
+  const investigationRequest = useRef<AbortController | null>(null)
 
   useEffect(() => () => {
     request.current?.abort()
@@ -43,6 +58,8 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     busy.current = false
     anomalyRequest.current?.abort()
     anomalyRequest.current = null
+    investigationRequest.current?.abort()
+    investigationRequest.current = null
   }, [])
 
   const refreshApiStatus = useCallback(async (force = false) => {
@@ -75,6 +92,10 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   }, [refreshApiStatus])
 
   const selectFile = useCallback((file: File | null) => {
+    investigationRequest.current?.abort()
+    investigationRequest.current = null
+    setInvestigation(initialInvestigation)
+    setInvestigationIndex('1')
     anomalyRequest.current?.abort()
     anomalyRequest.current = null
     setAnomaly(initialAnomalyState)
@@ -140,8 +161,41 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedFile, refreshApiStatus])
 
+  const selectInvestigationIndex = useCallback((value: string) => {
+    investigationRequest.current?.abort()
+    investigationRequest.current = null
+    setInvestigation(initialInvestigation)
+    setInvestigationIndex(value)
+  }, [])
+
+  const investigate = useCallback(async () => {
+    if (!selectedFile || investigationRequest.current) return
+    const index = Number(investigationIndex)
+    const total = analysis?.summary.total_records ?? (anomaly.result ? anomaly.result.evaluated_records + anomaly.result.skipped_records : undefined)
+    if (!investigationIndex.trim() || !Number.isSafeInteger(index) || index < 1 || (total !== undefined && index > total)) {
+      setInvestigation({ status: 'error', result: null, error: 'Informe um índice inteiro existente no CSV, a partir de 1.' })
+      return
+    }
+    const controller = new AbortController()
+    investigationRequest.current = controller
+    setInvestigation((previous) => ({ ...previous, status: 'loading', error: null }))
+    try {
+      const result = await createInvestigation(selectedFile, index, controller.signal)
+      if (investigationRequest.current === controller) setInvestigation({ status: 'success', result, error: null })
+    } catch (cause) {
+      if (investigationRequest.current === controller) setInvestigation((previous) => ({
+        ...previous, status: 'error', error: cause instanceof ApiError ? cause.message : 'Não foi possível concluir a investigação.',
+      }))
+    } finally {
+      if (investigationRequest.current === controller) {
+        investigationRequest.current = null
+        void refreshApiStatus(true)
+      }
+    }
+  }, [selectedFile, investigationIndex, analysis, anomaly.result, refreshApiStatus])
+
   return (
-    <AnalysisContext.Provider value={{ selectedFile, analysis, isAnalyzing, error, apiStatus, selectFile, analyze, anomaly, analyzeAnomalies }}>
+    <AnalysisContext.Provider value={{ selectedFile, analysis, isAnalyzing, error, apiStatus, selectFile, analyze, anomaly, analyzeAnomalies, investigation, investigationIndex, selectInvestigationIndex, investigate }}>
       {children}
     </AnalysisContext.Provider>
   )
