@@ -1,4 +1,4 @@
-# Frontend LucOps AI — Fase 7, Entrega 7.5.3
+# Frontend LucOps AI — Fase 7, Etapa 7.6 (integração inicial)
 
 Interface React + TypeScript com Vite, Tailwind CSS e React Router em modo declarativo. Visão Geral e Qualidade dos Dados apresentam os indicadores e as inconsistências reais retornados por `POST /analyses`. Os resultados e o arquivo selecionado permanecem apenas na memória da sessão. O dashboard Streamlit continua disponível e documentado no [README principal](../README.md#analytics--dashboard).
 
@@ -18,9 +18,9 @@ npm.cmd ci
 npm.cmd run dev
 ```
 
-Abra `http://localhost:5173`, selecione ou arraste um CSV e clique em **Analisar qualidade**. Durante o desenvolvimento, o Vite encaminha `/health`, `/analyses` e `/anomaly-analyses` para `http://127.0.0.1:8000`; o navegador usa requisições de mesma origem. Para outra configuração de publicação, `VITE_API_BASE_URL` pode definir a URL-base do cliente, desde que haja um proxy de mesma origem ou CORS autorizado pelo servidor. No PowerShell desta máquina, `npm.cmd` evita o bloqueio de execução do shim `npm.ps1`.
+Abra `http://localhost:5173`, selecione ou arraste um CSV e clique em **Analisar qualidade**. Durante o desenvolvimento, o Vite encaminha `/health`, `/analyses`, `/anomaly-analyses` e `/investigations` para `http://127.0.0.1:8000`; o navegador usa requisições de mesma origem. Para outra configuração de publicação, `VITE_API_BASE_URL` pode definir a URL-base do cliente, desde que haja um proxy de mesma origem ou CORS autorizado pelo servidor. No PowerShell desta máquina, `npm.cmd` evita o bloqueio de execução do shim `npm.ps1`.
 
-O formulário envia `FormData` com os campos `file` e `include_details=true`, na mesma requisição. A API retorna `quality_status`, `summary` (`total_records`, `valid_records`, `invalid_records`, `total_issues`, `valid_percentage`) e, quando disponível, `details`. A análise de qualidade não calcula anomalias: o respectivo indicador permanece **Não analisado** até uma execução explícita de ML. A seleção de outro CSV descarta resultados anteriores e cancela as requisições de qualidade e ML em andamento.
+O formulário envia `FormData` com os campos `file` e `include_details=true`, na mesma requisição. A API retorna `quality_status`, `summary` (`total_records`, `valid_records`, `invalid_records`, `total_issues`, `valid_percentage`) e, quando disponível, `details`. A análise de qualidade não calcula anomalias: o respectivo indicador permanece **Não analisado** até uma execução explícita de ML. A seleção de outro CSV descarta resultados anteriores e cancela as requisições de qualidade, ML e investigação em andamento.
 
 A sidebar consulta `/health` ao abrir e a cada 30 segundos, mostrando apenas a disponibilidade da FastAPI para análises. Isso não verifica ML nem OpenAI. Uma reanálise malsucedida do mesmo arquivo conserva o último resultado confirmado e o identifica como anterior; ao substituir o CSV, esse resultado é descartado. A verificação de conexão tem limite de 5 segundos e a análise de 30 segundos, incluindo a leitura completa do corpo da resposta. Durante o desenvolvimento, uma falha de conexão do proxy do Vite pode chegar como HTTP 500 vazio; o cliente consulta `/health` para distingui-la de um HTTP 500 retornado pelo backend.
 
@@ -51,7 +51,38 @@ Para executar a suíte Python completa, a partir da raiz, use o ambiente com os 
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-Os cinco links do menu funcionam. A Visão Geral e a página Qualidade dos Dados mostram os agregados reais do CSV atual, incluindo um gráfico de rosca calculado a partir de registros válidos e inválidos. Detecção de Anomalias oferece execução explícita, indicadores, distribuição e resultados por registro. Investigações e Relatórios ainda exibem estados de preparação.
+Os cinco links do menu funcionam. A Visão Geral e a página Qualidade dos Dados mostram os agregados reais do CSV atual, incluindo um gráfico de rosca calculado a partir de registros válidos e inválidos. Detecção de Anomalias oferece execução explícita, indicadores, distribuição e resultados por registro. Investigações com IA está integrada nesta branch ao provedor simulado; Relatórios continua como página de preparação. A integração da Etapa 7.6 aguarda validação manual, versionamento e merge.
+
+## Investigações com IA — Etapa 7.6
+
+Na branch `feat/react-ai-investigations`, acesse `/investigacoes` após selecionar um CSV na Visão Geral. Informe o **Índice do registro**, começando em 1 e sem contar o cabeçalho, e clique em **Investigar com IA**. Qualidade e ML não precisam ter sido executados no frontend: o servidor prepara novamente o contexto a partir do arquivo. Se houver resultados anteriores na sessão, seus índices alimentam atalhos de seleção e suas contagens delimitam o índice; esses atalhos não enviam scores ou indicadores como evidências. A lista de atalhos abrange somente os registros presentes nos resultados recebidos, que podem ser parciais no caso dos detalhes de qualidade.
+
+### Contrato e segurança
+
+`POST /investigations` recebe multipart com `file`, `record_index` (inteiro positivo) e `provider` (`simulated` por padrão no backend; também existe `openai` no contrato Python). **Esta interface envia explicitamente `provider=simulated` e não oferece acionamento do provedor pago.** Não precisa de chave de API, não altera `LUCOPS_AGENT_OPENAI_MAX_CALLS` e não chama um LLM real. Não há investigação automática ao selecionar arquivo, índice ou página.
+
+A resposta existente contém `schema_version`, `mode`, `provider`, `context`, `verified_evidence`, `hypotheses`, `recommendations`, `limitations`, `insufficient_evidence` e `actions_executed=false`. O contexto identifica o conjunto por SHA-256 e o registro pelo índice; inclui a referência minimizada da transação, inconsistências, informações de ML, evidências locais e limitações. Os estados de ML são `evaluated`, `ineligible` e `unavailable`. Não possuir previsão não equivale a não possuir anomalias.
+
+Cada evidência contém `evidence_id`, `kind`, `source` (`dataset_id`, `record_index` ou `null` para o lote, `function`, `field`), `description`, `value` e `expected`. Hipóteses têm `description`, `evidence_ids` e `status=unconfirmed`; recomendações têm `action` e `evidence_ids`. O cliente verifica a estrutura, o índice solicitado, a origem no mesmo conjunto e as referências existentes, e rejeita respostas em modo diferente do solicitado ou que indiquem ações executadas. As validações semânticas e a construção dos fatos continuam no backend; validar referências no navegador não comprova a verdade de uma hipótese.
+
+### Apresentação e estado da sessão
+
+A visão executiva mostra registro, valor minimizado disponibilizado pelo servidor (sem presumir moeda), contagem de inconsistências e situação de ML. O **Resumo dos fatos verificados** é uma síntese determinística do contexto, criada apenas para apresentação; não é um novo texto gerado por LLM. As evidências principais usam referências E1, E2 etc.; hipóteses são explicitamente não confirmadas e recomendações permanecem sugestões para revisão humana. Valores ocultados pelo servidor não são reconstruídos a partir dos resultados de qualidade ou ML.
+
+**Ver detalhes técnicos** preserva todas as evidências, seus identificadores completos e origens, SHA-256, versão e score de ML quando disponíveis, todas as limitações e o JSON completo recebido. A visão inicial apresenta até cinco evidências e limitações essenciais. O botão **Ver todas as evidências** permite consultar a lista completa; **Mostrar menos** retorna ao resumo. Todas as informações também continuam auditáveis no expansor. Campos e respostas são renderizados como texto, sem interpretar instruções ou HTML do CSV. Scores não são apresentados como probabilidade, risco ou severidade, e nenhuma correção é executada.
+
+HTTP 400 indica CSV inválido, 404 indica índice inexistente, 422 indica entrada inválida, 502 indica resposta rejeitada do provedor, 503 indica provedor indisponível e 500 indica falha interna. A interface usa mensagens próprias para esses erros, sem exibir detalhes internos. Reaproveita o prazo de 30 segundos e o cancelamento do cliente HTTP. Falhas não geram fallback para outro provedor.
+
+Qualidade, ML e investigação são estados independentes em memória. Trocar/remover o CSV limpa todos; trocar o índice limpa apenas a investigação e cancela sua solicitação. Respostas atrasadas são ignoradas. Falhas não apagam qualidade ou ML. Uma nova tentativa para o mesmo arquivo/índice conserva o último resultado confirmado, identificado como anterior. Não há persistência em localStorage ou histórico.
+
+Para conferir no desktop com a API e o Vite em execução:
+
+1. Selecione `data/sample/teste_anomalias.csv` na Visão Geral e abra **Investigações com IA**.
+2. Informe o índice **5** e clique em **Investigar com IA**. O modo deve ser `simulated`, sem LLM real; com o mesmo modelo `iforest-v1` previamente validado, o ML poderá contextualizar o alerta desse registro.
+3. Confira evidências, hipóteses, recomendações, limitações e referências completas nos detalhes. Sem modelo configurado, a investigação deve continuar mostrando ML indisponível.
+4. Troque o índice e o CSV: nenhum resultado anterior deve permanecer associado à nova seleção. Confira também `transacoes_invalidas.csv`, erros de índice e preservação da qualidade/ML.
+
+Os testes usam mocks e dados sintéticos, sem API ativa ou chamadas pagas. A aparência final ainda requer a primeira validação manual no desktop; esta entrega não exige uma nova rodada obrigatória de testes em tablet e celular. OpenAI no React, Relatórios, autenticação, banco de dados e deploy permanecem fora deste escopo.
 
 ## Anomalias — integração e dashboard (7.5.1–7.5.3)
 

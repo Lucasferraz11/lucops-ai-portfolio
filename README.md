@@ -16,6 +16,8 @@ O projeto possui motor de qualidade, CLI, FastAPI, Machine Learning e investiga�
 
 ## Visão geral
 
+A primeira integração React de Investigações com IA está implementada na branch `feat/react-ai-investigations`, em validação antes do versionamento e merge. Ela utiliza o endpoint existente `POST /investigations` com o provedor determinístico `simulated`, sem chamadas pagas ou LLM real. Essa integração ainda não está disponível na `main`; consulte o [contrato e as instruções do frontend](frontend/README.md#investigações-com-ia--etapa-76).
+
 O LucOps AI é uma plataforma modular de qualidade e monitoramento de dados empresariais.
 
 Seu objetivo é automatizar a identificação de inconsistências, gerar indicadores de qualidade e fornecer informações para apoiar análises e decisões.
@@ -177,7 +179,7 @@ probabilidade, severidade ou confirmação de fraude. ML permanece **Não analis
 até a execução explícita, e uma análise válida pode retornar zero anomalias.
 Qualidade e ML mantêm resultados independentes, descartados ao substituir o CSV.
 
-Investigações com IA e Relatórios continuam como páginas de preparação no React.
+Investigações com IA e Relatórios continuam como páginas de preparação no React da `main`; a primeira integração de investigação está disponível para validação na branch `feat/react-ai-investigations`.
 O dashboard Streamlit continua disponível conforme as instruções adiante.
 Consulte [execução, contrato e validação do frontend](frontend/README.md).
 
@@ -334,7 +336,7 @@ Os testes verificam códigos HTTP e informações retornadas no JSON.
 
 - Integração com bancos de dados.
 - Pipelines de ingestão e transformação de dados.
-- Integração de investigação com IA e relatórios na interface React.
+- Validação e integração à `main` das investigações no React, seguida da implementação da página Relatórios.
 - Integração com serviços Cloud.
 - Containerização com Docker.
 - Evolução da interface web e dos recursos de observabilidade.

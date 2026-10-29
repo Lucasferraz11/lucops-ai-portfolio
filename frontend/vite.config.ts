@@ -9,6 +9,7 @@ export default defineConfig({
       '/health': 'http://127.0.0.1:8000',
       '/analyses': 'http://127.0.0.1:8000',
       '/anomaly-analyses': 'http://127.0.0.1:8000',
+      '/investigations': 'http://127.0.0.1:8000',
     },
   },
   test: {
