@@ -258,3 +258,14 @@ describe('consistencia do resumo de qualidade', () => {
     },
   )
 })
+
+
+describe('limites da demonstracao publica', () => {
+  it.each([413, 429])('apresenta mensagem segura para HTTP %i sem repetir detalhes internos', async (status) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ detail: '/private/server/secret' }, { status })))
+    const pending = createAnalysis(csv)
+    await expect(pending).rejects.toMatchObject({ status, kind: 'http' })
+    await expect(pending).rejects.toThrow(status === 413 ? 'O CSV excede os limites' : 'O servidor est\u00e1 ocupado')
+    await expect(pending).rejects.not.toThrow('/private/')
+  })
+})

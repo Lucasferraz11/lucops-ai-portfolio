@@ -1,0 +1,47 @@
+# Preparation only. Do not connect this Blueprint until deploy is authorized.
+services:
+  - type: web
+    name: lucops-api
+    runtime: python
+    plan: free
+    branch: main
+    autoDeployTrigger: "off"
+    buildCommand: pip install -r requirements-render.txt && pip install --no-deps . && python scripts/prepare_render_model.py
+    startCommand: uvicorn lucops.api:app --host 0.0.0.0 --port $PORT --workers 1
+    healthCheckPath: /health
+    envVars:
+      - key: LUCOPS_MODEL_PATH
+        value: models/render-isolation-forest.joblib
+      - key: LUCOPS_MAX_CSV_BYTES
+        value: "5242880"
+      - key: LUCOPS_MAX_CSV_RECORDS
+        value: "10000"
+      - key: LUCOPS_MAX_CONCURRENT_ANALYSES
+        value: "1"
+      - key: LUCOPS_AGENT_OPENAI_MAX_CALLS
+        value: "0"
+      - key: LUCOPS_CORS_ORIGINS
+        sync: false
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: OPENBLAS_NUM_THREADS
+        value: "1"
+      - key: MKL_NUM_THREADS
+        value: "1"
+  - type: web
+    name: lucops-web
+    runtime: static
+    branch: main
+    rootDir: frontend
+    autoDeployTrigger: "off"
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: SKIP_INSTALL_DEPS
+        value: "true"
+      - key: VITE_API_BASE_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

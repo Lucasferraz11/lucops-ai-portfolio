@@ -112,6 +112,7 @@ sem chamadas pagas à OpenAI. Os workflows Python e frontend são independentes.
 
 ## Documentação
 
+- [Preparação para demonstração gratuita no Render](docs/render-deployment.md).
 - [Arquitetura, módulos e contratos HTTP](docs/architecture.md).
 - [Instalação, configuração, CLI, Streamlit e testes](docs/development.md).
 - [Frontend: contratos, estados, PDF e validação da interface](frontend/README.md).
