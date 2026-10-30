@@ -203,9 +203,13 @@ export async function request(path: '/health' | '/analyses' | '/anomaly-analyses
       const detail = isRecord(payload) ? payload.detail : undefined
       const message = response.status === 400 && typeof detail === 'string'
         ? detail
-        : response.status === 422
-          ? 'Arquivo ou parâmetros de envio inválidos.'
-          : `A análise falhou (HTTP ${response.status}). Tente novamente.`
+        : response.status === 413
+          ? 'O CSV excede os limites de tamanho ou quantidade de registros do servidor.'
+          : response.status === 429
+            ? 'O servidor está ocupado. Aguarde alguns instantes e tente novamente.'
+            : response.status === 422
+              ? 'Arquivo ou parâmetros de envio inválidos.'
+              : `A análise falhou (HTTP ${response.status}). Tente novamente.`
       throw new ApiError(message, response.status)
     }
 

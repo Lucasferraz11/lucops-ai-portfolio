@@ -1,13 +1,13 @@
 import csv
 from dataclasses import asdict
 from pathlib import Path
-from shutil import copyfileobj
 from tempfile import TemporaryDirectory
 from typing import Annotated, Literal
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 
 from .analysis_details import build_analysis_details
+from .api_limits import configure_api, save_csv_upload
 from .application import analyze_csv
 from .rules import is_positive_amount
 from .status import get_quality_status
@@ -17,6 +17,7 @@ app = FastAPI(
     description="API de qualidade e análise de dados empresariais",
     version="0.1.0",
 )
+configure_api(app)
 
 
 @app.get("/health")
@@ -29,6 +30,7 @@ def health_check() -> dict[str, str]:
 
 @app.post("/analyses")
 def create_analysis(
+    request: Request,
     file: Annotated[UploadFile, File()],
     include_details: Annotated[
         bool,
@@ -43,8 +45,7 @@ def create_analysis(
         csv_path = directory / "transacoes.csv"
         report_path = directory / "quality_report.txt"
 
-        with csv_path.open("wb") as destination:
-            copyfileobj(file.file, destination)
+        save_csv_upload(file, csv_path, request.app.state.csv_limits)
 
         try:
             result = analyze_csv(
@@ -88,6 +89,7 @@ def create_analysis(
     },
 )
 def create_anomaly_analysis(
+    request: Request,
     file: Annotated[UploadFile, File()],
 ) -> dict[str, object]:
     """Infer anomalies using only the trusted model configured on the server."""
@@ -101,18 +103,18 @@ def create_anomaly_analysis(
 
     with TemporaryDirectory() as temporary_dir:
         csv_path = Path(temporary_dir) / "transactions.csv"
-        with csv_path.open("wb") as destination:
-            copyfileobj(file.file, destination)
+        save_csv_upload(file, csv_path, request.app.state.csv_limits)
         try:
             return analyze_csv_anomalies(csv_path)
         except ModelUnavailableError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
         except (ValueError, csv.Error) as exc:
-            raise HTTPException(status_code=400, detail=f"CSV inválido: {exc}") from exc
+            raise HTTPException(status_code=400, detail="CSV inválido.") from exc
 
 
 @app.post("/investigations")
 def create_investigation(
+    request: Request,
     file: Annotated[UploadFile, File()],
     record_index: Annotated[int, Form()],
     provider: Annotated[Literal["simulated", "openai"], Form()] = "simulated",
@@ -129,8 +131,7 @@ def create_investigation(
         raise HTTPException(status_code=422, detail="O índice deve ser positivo.")
     with TemporaryDirectory() as temporary_dir:
         csv_path = Path(temporary_dir) / "transactions.csv"
-        with csv_path.open("wb") as destination:
-            copyfileobj(file.file, destination)
+        save_csv_upload(file, csv_path, request.app.state.csv_limits)
         try:
             records = load_csv(
                 csv_path,
