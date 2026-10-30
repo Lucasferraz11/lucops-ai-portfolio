@@ -5,6 +5,24 @@
 O LucOps AI analisa transações em CSV e reúne indicadores, inconsistências,
 alertas estatísticos e recomendações para revisão humana em uma plataforma web.
 
+**Demonstração online:** [Plataforma](https://lucops-web.onrender.com/) ·
+[API — health check](https://lucops-api.onrender.com/health).
+
+O backend no plano gratuito do Render pode demorar a responder no primeiro acesso.
+O modelo de Machine Learning publicado é demonstrativo e não se destina a decisões reais.
+
+## Prévia visual
+
+Capturas reais da demonstração com o CSV de exemplo do projeto e investigação
+em modo simulado, sem LLM externo.
+
+![Visão Geral do LucOps AI com resultados reais do CSV de exemplo](docs/images/visao-geral.png)
+
+[Qualidade dos Dados](docs/images/qualidade-dos-dados.png) ·
+[Anomalias](docs/images/anomalias.png) ·
+[Investigações](docs/images/investigacoes.png) ·
+[Relatórios](docs/images/relatorios.png)
+
 ## O problema
 
 Regras de qualidade encontram campos ausentes, valores inválidos e duplicidades.
